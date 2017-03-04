@@ -9,6 +9,7 @@ TEAMS = 9
 ROSTER_SIZE_H = 12
 ROSTER_SIZE_P = 9
 CATEGORIES_H = ['OBP', 'SLG', 'HR', 'R', 'SB']
+CATEGORIES_P = ['ERA', 'WHIP', 'QS', 'SO', 'SV']
 
 
 def calc_zscores(col):
@@ -19,7 +20,11 @@ def calc_zscores(col):
 
 
 def rank(players, categories, rosternum, bypos=False):
-    df = players.copy()[['FIRSTNAME', 'LASTNAME', 'POS'] + categories]
+    if bypos:
+        id_cols = ['FIRSTNAME', 'LASTNAME', 'POS']
+    else:
+        id_cols = ['FIRSTNAME', 'LASTNAME']
+    df = players.copy()[id_cols + categories]
 
     top = pd.DataFrame()
     for cat in categories:
@@ -45,6 +50,12 @@ def main():
     hitters['POS'].replace(to_replace=['LF', 'CF', 'RF'], value='OF', inplace=True)
     hitters_top = rank(hitters, CATEGORIES_H, ROSTER_SIZE_H*TEAMS, bypos=True)
     hitters_top.to_csv(os.path.join(DATA_DIR, "hitters.csv"))
+
+    pitchers = pd.read_excel(os.path.join(DATA_DIR, PECOTA_FILE), sheetname="Pitchers")
+    pitchers[['ERA', 'WHIP']] = pitchers[['ERA', 'WHIP']].multiply(-1)
+    pitchers_top = rank(pitchers, CATEGORIES_P, ROSTER_SIZE_P*TEAMS, bypos=False)
+    pitchers_top[['ERA', 'WHIP']] = pitchers_top[['ERA', 'WHIP']].multiply(-1)
+    pitchers_top.to_csv(os.path.join(DATA_DIR, "pitchers.csv"))
 
 
 if (__name__ == "__main__"):
