@@ -24,6 +24,26 @@ CATEGORIES_P = [
     {'name': 'SO', 'weight': None },
     {'name': 'SV', 'weight': None }
 ]
+POSITIONS = [
+    {'name': 'C', 'slots': 1},
+    {'name': '1B', 'slots': 1},
+    {'name': '2B', 'slots': 1},
+    {'name': '3B', 'slots': 1},
+    {'name': 'SS', 'slots': 1},
+    {'name': 'OF', 'slots': 3},
+    {'name': 'SP', 'slots': 5},
+    {'name': 'RP', 'slots': 2}
+]
+
+
+def impute_sp_rp(df):
+    sp = df['GS'] == df['G']
+    rp = df['GS'] == 0
+
+    df.ix[sp, 'POS'] = "SP"
+    df.ix[rp, 'POS'] = "RP"
+    df.ix[~np.logical_or(sp, rp), 'POS'] = "SP/RP"
+    return df
 
 
 def calc_zscores(col):
@@ -42,9 +62,7 @@ def weight_column(col, wt_col):
 def rank(players, categories, rosternum, bypos=False):
     df = players.copy()
 
-    id_cols = ['FIRSTNAME', 'LASTNAME']
-    if bypos:
-        id_cols.append('POS')
+    id_cols = ['FIRSTNAME', 'LASTNAME', 'POS']
 
     # set up and weight columns for analysis
     raw_cols = []
@@ -115,12 +133,12 @@ def main():
     hitters_top.to_csv(os.path.join(DATA_DIR, "hitters.csv"), index=False)
 
     pitchers = pd.read_excel(os.path.join(DATA_DIR, PECOTA_FILE), sheetname="Pitchers")
+    pitchers = impute_sp_rp(pitchers)
     pitchers[['ERA', 'WHIP']] = pitchers[['ERA', 'WHIP']].multiply(-1)
     pitchers_top = rank(pitchers, CATEGORIES_P, ROSTER_SIZE_P*TEAMS, bypos=False)
     pitchers_top[['ERA', 'WHIP']] = pitchers_top[['ERA', 'WHIP']].multiply(-1)
     pitchers_top.to_csv(os.path.join(DATA_DIR, "pitchers.csv"), index=False)
 
-    pitchers_top['POS'] = 'P'
     players_top = combine_ranks(hitters_top, pitchers_top)
     players_top.to_csv(os.path.join(DATA_DIR, "players.csv"), index=False)
 
