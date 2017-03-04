@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 DATA_DIR = "/Users/linusmarco/documents/data/PECOTA"
 PECOTA_FILE = "pecota_2017_03_01_86394.xls"
 TEAMS = 9
-ROSTER_SIZE_H = 12
-ROSTER_SIZE_P = 9
+# ROSTER_SIZE_H = 12
+# ROSTER_SIZE_P = 9
 CATEGORIES_H = [
     {'name': 'OBP', 'weight': 'PA' },
     {'name': 'SLG', 'weight': 'AB' },
@@ -24,15 +24,18 @@ CATEGORIES_P = [
     {'name': 'SO', 'weight': None },
     {'name': 'SV', 'weight': None }
 ]
-POSITIONS = [
+POSITIONS_H = [
     {'name': 'C', 'slots': 1},
     {'name': '1B', 'slots': 1},
     {'name': '2B', 'slots': 1},
     {'name': '3B', 'slots': 1},
     {'name': 'SS', 'slots': 1},
-    {'name': 'OF', 'slots': 3},
+    {'name': 'OF', 'slots': 3}
+]
+POSITIONS_P = [
     {'name': 'SP', 'slots': 5},
-    {'name': 'RP', 'slots': 2}
+    {'name': 'RP', 'slots': 2},
+    {'name': 'SP/RP', 'slots': 0}
 ]
 
 
@@ -44,6 +47,20 @@ def impute_sp_rp(df):
     df.ix[rp, 'POS'] = "RP"
     df.ix[~np.logical_or(sp, rp), 'POS'] = "SP/RP"
     return df
+
+
+def filter_top(df, col, limit, groupby=False):
+    if groupby:
+        top = pd.DataFrame()
+        for pos in limit:
+            pos_df = df.loc[df['POS'].str.strip() == pos['name']]
+            pos_largest = pos_df.nlargest(int(pos['slots']*TEAMS), col)
+            top = top.append(pos_largest)
+        largest = top.drop_duplicates()
+    else:
+        largest = df.nlargest(int(limit*TEAMS), col)
+
+    return largest
 
 
 def calc_zscores(col):
@@ -59,8 +76,12 @@ def weight_column(col, wt_col):
     return weighted
 
 
-def rank(players, categories, rosternum, bypos=False):
+def rank(players, categories, positions, bypos=False):
     df = players.copy()
+
+    # get info for later use
+    pos_list = [p['name'] for p in positions]
+    tot_rost = sum([p['slots'] for p in positions])
 
     id_cols = ['FIRSTNAME', 'LASTNAME', 'POS']
 
@@ -82,9 +103,15 @@ def rank(players, categories, rosternum, bypos=False):
     top = pd.DataFrame()
     for cat in categories:
         if (cat['weight'] == None):
-            largest = df.nlargest(rosternum, cat['name'])
+            if bypos:
+                largest = filter_top(df, cat['name'], positions, groupby=True)
+            else:
+                largest = filter_top(df, cat['name'], tot_rost)
         else:
-            largest = df.nlargest(rosternum, cat['name'] + '_WT')
+            if bypos:
+                largest = filter_top(df, cat['name'] + '_WT', positions, groupby=True)
+            else:
+                largest = filter_top(df, cat['name'] + '_WT', tot_rost)
         top = top.append(largest)
 
     top.drop_duplicates(inplace=True)
@@ -92,7 +119,12 @@ def rank(players, categories, rosternum, bypos=False):
     # calculate z scores for each category
     z_cols = [c + '_zscore' for c in raw_cols]
     if bypos:
-        top[z_cols] = top.groupby('POS')[val_cols].apply(calc_zscores)
+        top_pos = pd.DataFrame()
+        top_all = pd.DataFrame()
+        top_pos[z_cols] = top.groupby('POS')[val_cols].apply(calc_zscores)
+        top_all[z_cols] = top[val_cols].apply(calc_zscores)
+        for col in z_cols:
+            top[col] = (top_pos[col] + top_all[col]) / 2
     else:
         top[z_cols] = top[val_cols].apply(calc_zscores)
 
@@ -129,13 +161,13 @@ def combine_ranks(hitters, pitchers):
 def main():
     hitters = pd.read_excel(os.path.join(DATA_DIR, PECOTA_FILE), sheetname="Hitters")
     hitters['POS'].replace(to_replace=['LF', 'CF', 'RF'], value='OF', inplace=True)
-    hitters_top = rank(hitters, CATEGORIES_H, ROSTER_SIZE_H*TEAMS, bypos=True)
+    hitters_top = rank(hitters, CATEGORIES_H, POSITIONS_H, bypos=True)
     hitters_top.to_csv(os.path.join(DATA_DIR, "hitters.csv"), index=False)
 
     pitchers = pd.read_excel(os.path.join(DATA_DIR, PECOTA_FILE), sheetname="Pitchers")
     pitchers = impute_sp_rp(pitchers)
     pitchers[['ERA', 'WHIP']] = pitchers[['ERA', 'WHIP']].multiply(-1)
-    pitchers_top = rank(pitchers, CATEGORIES_P, ROSTER_SIZE_P*TEAMS, bypos=False)
+    pitchers_top = rank(pitchers, CATEGORIES_P, POSITIONS_P, bypos=False)
     pitchers_top[['ERA', 'WHIP']] = pitchers_top[['ERA', 'WHIP']].multiply(-1)
     pitchers_top.to_csv(os.path.join(DATA_DIR, "pitchers.csv"), index=False)
 

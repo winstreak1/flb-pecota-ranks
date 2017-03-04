@@ -1,4 +1,4 @@
 # flb-pecota-ranks
 
 ### TO DO:
-- include top players by position, not overall
+- screw with weights to make hitters better than pitchers
