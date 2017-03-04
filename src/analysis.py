@@ -97,6 +97,15 @@ def rank(players, categories, rosternum, bypos=False):
     return top
 
 
+def combine_ranks(df1, df2):
+    top = df1.append(df2)
+    top.sort_values(by='all_zscore', ascending=False, inplace=True)
+    top.reset_index(drop=True, inplace=True)
+    top['rank'] = top.index + 1
+    print(top.head(50))
+    return top
+
+
 def main():
     hitters = pd.read_excel(os.path.join(DATA_DIR, PECOTA_FILE), sheetname="Hitters")
     hitters['POS'].replace(to_replace=['LF', 'CF', 'RF'], value='OF', inplace=True)
@@ -108,6 +117,9 @@ def main():
     pitchers_top = rank(pitchers, CATEGORIES_P, ROSTER_SIZE_P*TEAMS, bypos=False)
     pitchers_top[['ERA', 'WHIP']] = pitchers_top[['ERA', 'WHIP']].multiply(-1)
     pitchers_top.to_csv(os.path.join(DATA_DIR, "pitchers.csv"), index=False)
+
+    players_top = combine_ranks(hitters_top, pitchers_top)
+    players_top.to_csv(os.path.join(DATA_DIR, "players.csv"), index=False)
 
 
 if (__name__ == "__main__"):
