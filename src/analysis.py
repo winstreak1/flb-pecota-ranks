@@ -97,11 +97,13 @@ def rank(players, categories, rosternum, bypos=False):
     return top
 
 
-def combine_ranks(df1, df2):
-    top = df1.append(df2)
+def combine_ranks(hitters, pitchers):
+    cols = list(hitters.columns.values) + [c for c in pitchers.columns.values if c not in hitters.columns.values]
+    top = hitters.append(pitchers)
     top.sort_values(by='all_zscore', ascending=False, inplace=True)
     top.reset_index(drop=True, inplace=True)
     top['rank'] = top.index + 1
+    top = top[cols]
     print(top.head(50))
     return top
 
@@ -118,6 +120,7 @@ def main():
     pitchers_top[['ERA', 'WHIP']] = pitchers_top[['ERA', 'WHIP']].multiply(-1)
     pitchers_top.to_csv(os.path.join(DATA_DIR, "pitchers.csv"), index=False)
 
+    pitchers_top['POS'] = 'P'
     players_top = combine_ranks(hitters_top, pitchers_top)
     players_top.to_csv(os.path.join(DATA_DIR, "players.csv"), index=False)
 
