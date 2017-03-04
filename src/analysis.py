@@ -55,10 +55,10 @@ def rank(players, categories, rosternum, wt_cats=None, wt_col=None, bypos=False)
 
 
 def main():
-    # hitters = pd.read_excel(os.path.join(DATA_DIR, PECOTA_FILE), sheetname="Hitters")
-    # hitters['POS'].replace(to_replace=['LF', 'CF', 'RF'], value='OF', inplace=True)
-    # hitters_top = rank(hitters, CATEGORIES_H, ROSTER_SIZE_H*TEAMS, bypos=True)
-    # hitters_top.to_csv(os.path.join(DATA_DIR, "hitters.csv"))
+    hitters = pd.read_excel(os.path.join(DATA_DIR, PECOTA_FILE), sheetname="Hitters")
+    hitters['POS'].replace(to_replace=['LF', 'CF', 'RF'], value='OF', inplace=True)
+    hitters_top = rank(hitters, CATEGORIES_H, ROSTER_SIZE_H*TEAMS, wt_cats=['OBP', 'SLG'], wt_col='PA', bypos=True)
+    hitters_top.to_csv(os.path.join(DATA_DIR, "hitters.csv"))
 
     pitchers = pd.read_excel(os.path.join(DATA_DIR, PECOTA_FILE), sheetname="Pitchers")
     pitchers[['ERA', 'WHIP']] = pitchers[['ERA', 'WHIP']].multiply(-1)
