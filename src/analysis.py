@@ -18,28 +18,33 @@ def calc_zscores(col):
     return z
 
 
+def rank(players, categories, rosternum, bypos=False):
+    df = players.copy()[['FIRSTNAME', 'LASTNAME', 'POS'] + categories]
+
+    top = pd.DataFrame()
+    for cat in categories:
+        top = top.append(df.nlargest(rosternum, cat))
+    top.drop_duplicates(inplace=True)
+
+    z_cols = [x + '_zscore' for x in categories]
+    if bypos:
+        top[z_cols] = top.groupby('POS')[categories].apply(calc_zscores)
+    else:
+        top[z_cols] = top[categories].apply(calc_zscores)
+    top['all_zscore'] = top[z_cols].sum(axis=1)
+    top.sort_values(by='all_zscore', ascending=False, inplace=True)
+    top.reset_index(drop=True, inplace=True)
+    top['rank'] = top.index + 1
+
+    print(top.head(50))
+    return top
+
+
 def main():
     hitters = pd.read_excel(os.path.join(DATA_DIR, PECOTA_FILE), sheetname="Hitters")
-    hitters = hitters[['FIRSTNAME', 'LASTNAME', 'POS'] + CATEGORIES_H]
-    print('UNIVERSE: {}'.format(len(hitters)))
-
-    hitters_top = pd.DataFrame()
-    for cat in CATEGORIES_H:
-        hitters_top = hitters_top.append(hitters.nlargest(int(ROSTER_SIZE_H*TEAMS), cat))
-
-    hitters_top.drop_duplicates(inplace=True)
-    print('TOP ANY CATEGORY: {}'.format(len(hitters_top)))
-
-    z_cols = [x + '_zscore' for x in CATEGORIES_H]
-    hitters_top[z_cols] = hitters_top[CATEGORIES_H].apply(calc_zscores)
-    hitters_top['all_zscore'] = hitters_top[z_cols].sum(axis=1)
-    hitters_top.sort_values(by='all_zscore', ascending=False, inplace=True)
-    hitters_top.reset_index(drop=True, inplace=True)
-    hitters_top['rank'] = hitters_top.index + 1
-
-    hitters_top.to_csv(os.path.join(DATA_DIR, "hitters_top.csv"))
-
-    print(hitters_top.head(50))
+    hitters['POS'].replace(to_replace=['LF', 'CF', 'RF'], value='OF', inplace=True)
+    hitters_top = rank(hitters, CATEGORIES_H, ROSTER_SIZE_H*TEAMS, bypos=True)
+    hitters_top.to_csv(os.path.join(DATA_DIR, "hitters.csv"))
 
 
 if (__name__ == "__main__"):
