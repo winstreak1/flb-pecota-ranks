@@ -8,8 +8,10 @@ import matplotlib.pyplot as plt
 DATA_DIR = "/Users/linusmarco/documents/data/PECOTA"
 PECOTA_FILE = "pecota_2017_03_01_86394.xls"
 TEAMS = 9
-# ROSTER_SIZE_H = 12
-# ROSTER_SIZE_P = 9
+
+UPSIDE_LOVE = 0.3
+DOWNSIDE_HATE = 0.7
+
 CATEGORIES_H = [
     {'name': 'OBP', 'weight': 'PA' },
     {'name': 'SLG', 'weight': 'AB' },
@@ -30,13 +32,30 @@ POSITIONS_H = [
     {'name': '2B', 'slots': 1},
     {'name': '3B', 'slots': 1},
     {'name': 'SS', 'slots': 1},
-    {'name': 'OF', 'slots': 3}
+    {'name': 'OF', 'slots': 3},
+    {'name': 'BENCH', 'slots': 4}
 ]
 POSITIONS_P = [
     {'name': 'SP', 'slots': 5},
     {'name': 'RP', 'slots': 2},
-    {'name': 'SP/RP', 'slots': 0}
+    {'name': 'SP/RP', 'slots': 0},
+    {'name': 'BENCH', 'slots': 2}
 ]
+
+
+def resort(df, col):
+    df.sort_values(by=col, ascending=False, inplace=True)
+    df.reset_index(drop=True, inplace=True)
+    df['rank'] = df.index + 1
+    return df    
+
+
+def risk_adjust(df):
+    collapse_fac = (1 - (df['COLLAPSE'] / 100)*DOWNSIDE_HATE)
+    breakout_fac = (1 + (df['BREAKOUT'] / 100)*UPSIDE_LOVE)
+    df['riskadj_zscore'] = df['all_zscore']*collapse_fac*breakout_fac
+    df = resort(df, 'riskadj_zscore')
+    return df
 
 
 def impute_sp_rp(df):
@@ -51,10 +70,13 @@ def impute_sp_rp(df):
 
 def filter_top(df, col, limit, groupby=False):
     if groupby:
+        start_rost = sum([p['slots'] for p in limit if p['name'] != 'BENCH'])
+        tot_rost = sum([p['slots'] for p in limit])
+        bench_mult = tot_rost / start_rost
         top = pd.DataFrame()
         for pos in limit:
             pos_df = df.loc[df['POS'].str.strip() == pos['name']]
-            pos_largest = pos_df.nlargest(int(pos['slots']*TEAMS), col)
+            pos_largest = pos_df.nlargest(int(pos['slots']*TEAMS*bench_mult), col)
             top = top.append(pos_largest)
         largest = top.drop_duplicates()
     else:
@@ -83,7 +105,7 @@ def rank(players, categories, positions, bypos=False):
     pos_list = [p['name'] for p in positions]
     tot_rost = sum([p['slots'] for p in positions])
 
-    id_cols = ['FIRSTNAME', 'LASTNAME', 'POS']
+    id_cols = ['FIRSTNAME', 'LASTNAME', 'POS', 'BREAKOUT', 'COLLAPSE']
 
     # set up and weight columns for analysis
     raw_cols = []
@@ -130,12 +152,11 @@ def rank(players, categories, positions, bypos=False):
 
     # rank by sum of z scores
     top['all_zscore'] = top[z_cols].sum(axis=1)
-    top.sort_values(by='all_zscore', ascending=False, inplace=True)
-    top.reset_index(drop=True, inplace=True)
-    top['rank'] = top.index + 1
+    top = risk_adjust(top)
+    top = resort(top, 'riskadj_zscore')
 
     # organize columns
-    cols = ['rank', 'all_zscore']
+    cols = ['rank', 'all_zscore', 'riskadj_zscore']
     cols = cols + id_cols + wt_cols
     for c in categories:
         cols.append(c['name'])
@@ -147,12 +168,10 @@ def rank(players, categories, positions, bypos=False):
     return top
 
 
-def combine_ranks(hitters, pitchers):
+def combine_ranks(hitters, pitchers, rank_col):
     cols = list(hitters.columns.values) + [c for c in pitchers.columns.values if c not in hitters.columns.values]
     top = hitters.append(pitchers)
-    top.sort_values(by='all_zscore', ascending=False, inplace=True)
-    top.reset_index(drop=True, inplace=True)
-    top['rank'] = top.index + 1
+    top = resort(top, rank_col)
     top = top[cols]
     print(top.head(50))
     return top
@@ -171,7 +190,7 @@ def main():
     pitchers_top[['ERA', 'WHIP']] = pitchers_top[['ERA', 'WHIP']].multiply(-1)
     pitchers_top.to_csv(os.path.join(DATA_DIR, "pitchers.csv"), index=False)
 
-    players_top = combine_ranks(hitters_top, pitchers_top)
+    players_top = combine_ranks(hitters_top, pitchers_top, 'riskadj_zscore')
     players_top.to_csv(os.path.join(DATA_DIR, "players.csv"), index=False)
 
 
