@@ -186,7 +186,7 @@ def main():
     pitchers = pd.read_excel(os.path.join(DATA_DIR, PECOTA_FILE), sheetname="Pitchers")
     pitchers = impute_sp_rp(pitchers)
     pitchers[['ERA', 'WHIP']] = pitchers[['ERA', 'WHIP']].multiply(-1)
-    pitchers_top = rank(pitchers, CATEGORIES_P, POSITIONS_P, bypos=False)
+    pitchers_top = rank(pitchers, CATEGORIES_P, POSITIONS_P, bypos=True)
     pitchers_top[['ERA', 'WHIP']] = pitchers_top[['ERA', 'WHIP']].multiply(-1)
     pitchers_top.to_csv(os.path.join(DATA_DIR, "pitchers.csv"), index=False)
 
