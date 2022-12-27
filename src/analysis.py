@@ -5,7 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 
-DATA_DIR = "/Users/linusmarco/documents/data/PECOTA"
+DATA_DIR = "Users\17273\Desktop\CS 580 - AI\flb-pecota-ranks\src"
 PECOTA_FILE = "pecota_2017_03_01_86394.xls"
 TEAMS = 9
 
